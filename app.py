@@ -1,4 +1,6 @@
 import streamlit as st
+import pandas as pd
+from datetime import datetime
 
 # ==========================================
 # CONFIGURACIÓN GENERAL
@@ -9,7 +11,20 @@ st.set_page_config(
     page_icon="📦",
     layout="wide"
 )
+# ==========================================
+# CARGA DE DATOS
+# ==========================================
 
+@st.cache_data
+def cargar_datos():
+    df = pd.read_csv("inventario_demo_glinsa.csv")
+    df["caducidad"] = pd.to_datetime(
+        df["caducidad"],
+        errors="coerce"
+    )
+    return df
+
+df = cargar_datos()
 # ==========================================
 # MENÚ LATERAL
 # ==========================================
