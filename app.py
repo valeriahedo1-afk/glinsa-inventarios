@@ -26,6 +26,32 @@ def cargar_datos():
 
 df = cargar_datos()
 # ==========================================
+# CÁLCULO DE INDICADORES
+# ==========================================
+
+hoy = pd.Timestamp.today().normalize()
+
+# Productos únicos
+total_productos = df["producto"].nunique()
+
+# Lotes con existencia mayor a cero
+lotes_activos = df.loc[
+    df["existencia"] > 0,
+    "lote"
+].nunique()
+
+# Días restantes para caducidad
+df["dias_para_caducar"] = (
+    df["caducidad"] - hoy
+).dt.days
+
+# Lotes que caducan en los próximos 90 días
+proximos_caducar = df[
+    (df["dias_para_caducar"] >= 0) &
+    (df["dias_para_caducar"] <= 90) &
+    (df["existencia"] > 0)
+]["lote"].nunique()
+# ==========================================
 # MENÚ LATERAL
 # ==========================================
 
@@ -66,28 +92,28 @@ if modulo == "Dashboard":
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-        st.metric(
-            label="Productos",
-            value="--"
-        )
+    st.metric(
+        label="Productos",
+        value=total_productos
+    )
 
-    with col2:
-        st.metric(
-            label="Lotes activos",
-            value="--"
-        )
+with col2:
+    st.metric(
+        label="Lotes activos",
+        value=lotes_activos
+    )
 
-    with col3:
-        st.metric(
-            label="Próximos a caducar",
-            value="--"
-        )
+with col3:
+    st.metric(
+        label="Próximos a caducar",
+        value=proximos_caducar
+    )
 
-    with col4:
-        st.metric(
-            label="Productos por reabastecer",
-            value="--"
-        )
+with col4:
+    st.metric(
+        label="Productos por reabastecer",
+        value="--"
+    )
 
     st.divider()
 
