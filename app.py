@@ -1,9 +1,9 @@
 import streamlit as st
 import pandas as pd
 
-# ==========================================
+# ============================================================
 # CONFIGURACIÓN GENERAL
-# ==========================================
+# ============================================================
 
 st.set_page_config(
     page_title="GLINSA | Inventarios",
@@ -12,15 +12,15 @@ st.set_page_config(
 )
 
 
-# ==========================================
+# ============================================================
 # CARGA DE DATOS
-# ==========================================
+# ============================================================
 
 @st.cache_data
 def cargar_datos():
     df = pd.read_csv("inventario_demo_glinsa.csv")
 
-    # Convertir caducidad a formato fecha
+    # Convertir fecha de caducidad
     df["caducidad"] = pd.to_datetime(
         df["caducidad"],
         errors="coerce"
@@ -38,20 +38,11 @@ def cargar_datos():
 df = cargar_datos()
 
 
-# ==========================================
-# CÁLCULO DE INDICADORES
-# ==========================================
+# ============================================================
+# CÁLCULOS GENERALES
+# ============================================================
 
 hoy = pd.Timestamp.today().normalize()
-
-# Productos únicos
-total_productos = df["producto"].nunique()
-
-# Lotes activos
-lotes_activos = df.loc[
-    df["existencia"] > 0,
-    "lote"
-].nunique()
 
 # Días restantes para caducidad
 df["dias_para_caducar"] = (
@@ -59,26 +50,25 @@ df["dias_para_caducar"] = (
 ).dt.days
 
 
-# ==========================================
-# CLASIFICACIÓN DE CADUCIDADES
-# ==========================================
+# ============================================================
+# CLASIFICACIÓN DE CADUCIDAD
+# ============================================================
 
 def clasificar_caducidad(dias):
 
     if pd.isna(dias):
         return "⚪ Sin fecha"
 
-    elif dias < 0:
+    if dias < 0:
         return "⚫ Vencido"
 
-    elif dias <= 30:
+    if dias <= 30:
         return "🔴 Crítico"
 
-    elif dias <= 90:
+    if dias <= 90:
         return "🟡 Atención"
 
-    else:
-        return "🟢 Vigente"
+    return "🟢 Vigente"
 
 
 df["estado_caducidad"] = df["dias_para_caducar"].apply(
@@ -86,50 +76,64 @@ df["estado_caducidad"] = df["dias_para_caducar"].apply(
 )
 
 
-# ==========================================
-# LOTES PRÓXIMOS A CADUCAR
-# ==========================================
+# ============================================================
+# INVENTARIO ACTIVO
+# ============================================================
 
-proximos_caducar = df[
-    (df["dias_para_caducar"] >= 0) &
-    (df["dias_para_caducar"] <= 90) &
-    (df["existencia"] > 0)
+df_activo = df[
+    df["existencia"] > 0
+].copy()
+
+
+# ============================================================
+# KPIs GENERALES
+# ============================================================
+
+total_productos = df["producto"].nunique()
+
+lotes_activos = df_activo["lote"].nunique()
+
+proximos_caducar = df_activo[
+    (df_activo["dias_para_caducar"] >= 0) &
+    (df_activo["dias_para_caducar"] <= 90)
 ]["lote"].nunique()
 
 
-# ==========================================
-# INDICADORES DEL SEMÁFORO
-# ==========================================
+# ============================================================
+# KPIs DEL SEMÁFORO
+# ============================================================
 
-lotes_criticos = df[
-    (df["dias_para_caducar"] >= 0) &
-    (df["dias_para_caducar"] <= 30) &
-    (df["existencia"] > 0)
-]["lote"].nunique()
-
-lotes_atencion = df[
-    (df["dias_para_caducar"] > 30) &
-    (df["dias_para_caducar"] <= 90) &
-    (df["existencia"] > 0)
-]["lote"].nunique()
-
-lotes_vigentes = df[
-    (df["dias_para_caducar"] > 90) &
-    (df["existencia"] > 0)
-]["lote"].nunique()
-
-lotes_vencidos = df[
-    (df["dias_para_caducar"] < 0) &
-    (df["existencia"] > 0)
+lotes_criticos = df_activo[
+    (df_activo["dias_para_caducar"] >= 0) &
+    (df_activo["dias_para_caducar"] <= 30)
 ]["lote"].nunique()
 
 
-# ==========================================
+lotes_atencion = df_activo[
+    (df_activo["dias_para_caducar"] > 30) &
+    (df_activo["dias_para_caducar"] <= 90)
+]["lote"].nunique()
+
+
+lotes_vigentes = df_activo[
+    df_activo["dias_para_caducar"] > 90
+]["lote"].nunique()
+
+
+lotes_vencidos = df_activo[
+    df_activo["dias_para_caducar"] < 0
+]["lote"].nunique()
+
+
+# ============================================================
 # MENÚ LATERAL
-# ==========================================
+# ============================================================
 
 st.sidebar.title("GLINSA")
-st.sidebar.caption("Sistema Inteligente de Inventarios")
+
+st.sidebar.caption(
+    "Sistema Inteligente de Inventarios"
+)
 
 modulo = st.sidebar.radio(
     "Navegación",
@@ -151,9 +155,9 @@ st.sidebar.caption(
 )
 
 
-# ==========================================
+# ============================================================
 # DASHBOARD
-# ==========================================
+# ============================================================
 
 if modulo == "Dashboard":
 
@@ -165,9 +169,10 @@ if modulo == "Dashboard":
 
     st.divider()
 
-    # --------------------------------------
+
+    # --------------------------------------------------------
     # KPIs PRINCIPALES
-    # --------------------------------------
+    # --------------------------------------------------------
 
     col1, col2, col3, col4 = st.columns(4)
 
@@ -197,58 +202,58 @@ if modulo == "Dashboard":
 
     st.divider()
 
-    # --------------------------------------
-    # SEMÁFORO DE CADUCIDADES
-    # --------------------------------------
 
-      st.subheader("🚦 Semáforo de caducidades")
+    # --------------------------------------------------------
+    # SEMÁFORO DE CADUCIDADES
+    # --------------------------------------------------------
+
+    st.subheader("🚦 Semáforo de caducidades")
 
     sem1, sem2, sem3, sem4 = st.columns(4)
 
     with sem1:
         st.metric(
-            "🔴 Críticos (0–30 días)",
-            lotes_criticos
+            label="🔴 Críticos (0–30 días)",
+            value=lotes_criticos
         )
 
     with sem2:
         st.metric(
-            "🟡 Atención (31–90 días)",
-            lotes_atencion
+            label="🟡 Atención (31–90 días)",
+            value=lotes_atencion
         )
 
     with sem3:
         st.metric(
-            "🟢 Vigentes (+90 días)",
-            lotes_vigentes
+            label="🟢 Vigentes (+90 días)",
+            value=lotes_vigentes
         )
 
     with sem4:
         st.metric(
-            "⚫ Vencidos",
-            lotes_vencidos
+            label="⚫ Vencidos",
+            value=lotes_vencidos
         )
 
-    # --------------------------------------
-    # ALERTAS DE INVENTARIO
-    # --------------------------------------
+    st.divider()
+
+
+    # --------------------------------------------------------
+    # ALERTAS DE CADUCIDAD
+    # --------------------------------------------------------
 
     st.subheader("⚠️ Alertas de caducidad")
 
-    alertas = df[
-        (
-            (df["dias_para_caducar"] <= 90) |
-            (df["dias_para_caducar"] < 0)
-        ) &
-        (df["existencia"] > 0)
+    alertas = df_activo[
+        df_activo["dias_para_caducar"] <= 90
     ].copy()
 
-    if len(alertas) > 0:
+    alertas = alertas.sort_values(
+        by="dias_para_caducar",
+        ascending=True
+    )
 
-        alertas = alertas.sort_values(
-            by="dias_para_caducar",
-            ascending=True
-        )
+    if not alertas.empty:
 
         tabla_alertas = alertas[
             [
@@ -286,56 +291,115 @@ if modulo == "Dashboard":
     else:
 
         st.success(
-            "No existen lotes con caducidad menor a 90 días."
+            "No existen lotes con caducidad menor "
+            "o igual a 90 días."
         )
+
 
     st.divider()
 
-    # --------------------------------------
+
+    # --------------------------------------------------------
     # ESTADO DEL ALMACÉN
-    # --------------------------------------
+    # --------------------------------------------------------
 
     st.subheader("📦 Estado del almacén")
 
     st.info(
-        "En esta sección incorporaremos posteriormente "
-        "el análisis de existencias, stock mínimo y "
-        "necesidades de reabastecimiento."
+        "En esta sección incorporaremos el análisis "
+        "de existencias, stock mínimo y necesidades "
+        "de reabastecimiento."
     )
+
 
     st.divider()
 
-    # --------------------------------------
+
+    # --------------------------------------------------------
     # MOVIMIENTO DE INVENTARIO
-    # --------------------------------------
+    # --------------------------------------------------------
 
     st.subheader("📈 Movimiento de inventario")
 
     st.info(
-        "Esta sección mostrará posteriormente las entradas "
-        "y salidas históricas del almacén."
+        "Esta sección mostrará las entradas y salidas "
+        "históricas del almacén."
     )
 
 
-# ==========================================
+# ============================================================
 # INVENTARIO
-# ==========================================
+# ============================================================
 
 elif modulo == "Inventario":
 
     st.title("📦 Inventario")
 
-    st.write(
-        "Consulta de existencias por producto, lote, "
-        "ubicación y fecha de caducidad."
+    st.caption(
+        "Consulta de existencias por producto y lote"
     )
 
-    st.info("Módulo en construcción")
+    st.divider()
+
+    # Buscador
+    busqueda = st.text_input(
+        "🔎 Buscar producto",
+        placeholder="Escribe el nombre del producto..."
+    )
+
+    inventario_mostrar = df_activo.copy()
+
+    if busqueda:
+
+        inventario_mostrar = inventario_mostrar[
+            inventario_mostrar["producto"]
+            .astype(str)
+            .str.contains(
+                busqueda,
+                case=False,
+                na=False
+            )
+        ]
+
+    inventario_mostrar = inventario_mostrar.sort_values(
+        by="producto"
+    )
+
+    tabla_inventario = inventario_mostrar[
+        [
+            "producto",
+            "lote",
+            "existencia",
+            "unidad",
+            "caducidad",
+            "estado_caducidad"
+        ]
+    ].copy()
+
+    tabla_inventario.columns = [
+        "Producto",
+        "Lote",
+        "Existencia",
+        "Unidad",
+        "Caducidad",
+        "Estado"
+    ]
+
+    tabla_inventario["Caducidad"] = (
+        tabla_inventario["Caducidad"]
+        .dt.strftime("%d/%m/%Y")
+    )
+
+    st.dataframe(
+        tabla_inventario,
+        use_container_width=True,
+        hide_index=True
+    )
 
 
-# ==========================================
+# ============================================================
 # RECEPCIÓN Y CALIDAD
-# ==========================================
+# ============================================================
 
 elif modulo == "Recepción y Calidad":
 
@@ -346,40 +410,82 @@ elif modulo == "Recepción y Calidad":
         "caducidades y documentación de calidad."
     )
 
-    st.info("Módulo en construcción")
+    st.info(
+        "Módulo en construcción"
+    )
 
 
-# ==========================================
+# ============================================================
 # ENTRADAS Y SALIDAS
-# ==========================================
+# ============================================================
 
 elif modulo == "Entradas y Salidas":
 
     st.title("🚚 Entradas y Salidas")
 
     st.write(
-        "Registro y monitoreo de movimientos del almacén."
+        "Registro y monitoreo de movimientos "
+        "del almacén."
     )
 
-    st.info("Módulo en construcción")
+    st.info(
+        "Módulo en construcción"
+    )
 
 
-# ==========================================
+# ============================================================
 # CADUCIDADES
-# ==========================================
+# ============================================================
 
 elif modulo == "Caducidades":
 
     st.title("⏳ Control de Caducidades")
 
     st.caption(
-        "Monitoreo de lotes y productos según su fecha "
-        "de caducidad."
+        "Monitoreo de productos y lotes según "
+        "su fecha de caducidad"
     )
 
     st.divider()
 
-    # Filtro por estado
+
+    # --------------------------------------------------------
+    # KPIs DE CADUCIDAD
+    # --------------------------------------------------------
+
+    c1, c2, c3, c4 = st.columns(4)
+
+    with c1:
+        st.metric(
+            "🔴 Críticos",
+            lotes_criticos
+        )
+
+    with c2:
+        st.metric(
+            "🟡 Atención",
+            lotes_atencion
+        )
+
+    with c3:
+        st.metric(
+            "🟢 Vigentes",
+            lotes_vigentes
+        )
+
+    with c4:
+        st.metric(
+            "⚫ Vencidos",
+            lotes_vencidos
+        )
+
+    st.divider()
+
+
+    # --------------------------------------------------------
+    # FILTRO
+    # --------------------------------------------------------
+
     estado_seleccionado = st.selectbox(
         "Filtrar por estado",
         [
@@ -392,24 +498,25 @@ elif modulo == "Caducidades":
         ]
     )
 
-    inventario_activo = df[
-        df["existencia"] > 0
-    ].copy()
+    tabla_filtrada = df_activo.copy()
 
     if estado_seleccionado != "Todos":
 
-        inventario_activo = inventario_activo[
-            inventario_activo["estado_caducidad"]
+        tabla_filtrada = tabla_filtrada[
+            tabla_filtrada["estado_caducidad"]
             == estado_seleccionado
         ]
 
-    inventario_activo = inventario_activo.sort_values(
+
+    # Ordenar por caducidad
+    tabla_filtrada = tabla_filtrada.sort_values(
         by="dias_para_caducar",
         ascending=True,
         na_position="last"
     )
 
-    tabla_caducidades = inventario_activo[
+
+    tabla_caducidades = tabla_filtrada[
         [
             "estado_caducidad",
             "producto",
@@ -421,6 +528,7 @@ elif modulo == "Caducidades":
         ]
     ].copy()
 
+
     tabla_caducidades.columns = [
         "Estado",
         "Producto",
@@ -431,10 +539,12 @@ elif modulo == "Caducidades":
         "Días restantes"
     ]
 
+
     tabla_caducidades["Caducidad"] = (
         tabla_caducidades["Caducidad"]
         .dt.strftime("%d/%m/%Y")
     )
+
 
     st.dataframe(
         tabla_caducidades,
@@ -443,24 +553,9 @@ elif modulo == "Caducidades":
     )
 
 
-# ==========================================
-# ENTRADAS Y SALIDAS
-# ==========================================
-
-elif modulo == "Entradas y Salidas":
-
-    st.title("🚚 Entradas y Salidas")
-
-    st.write(
-        "Registro y monitoreo de movimientos del almacén."
-    )
-
-    st.info("Módulo en construcción")
-
-
-# ==========================================
+# ============================================================
 # PREDICCIÓN Y REABASTO
-# ==========================================
+# ============================================================
 
 elif modulo == "Predicción y Reabasto":
 
@@ -471,12 +566,14 @@ elif modulo == "Predicción y Reabasto":
         "de reabastecimiento."
     )
 
-    st.info("Módulo en construcción")
+    st.info(
+        "Módulo en construcción"
+    )
 
 
-# ==========================================
+# ============================================================
 # IA DOCUMENTAL
-# ==========================================
+# ============================================================
 
 elif modulo == "IA Documental":
 
@@ -487,7 +584,9 @@ elif modulo == "IA Documental":
         "y documentación de recepción."
     )
 
-    st.info("Módulo en construcción")
+    st.info(
+        "Módulo en construcción"
+    )
 
     
 
