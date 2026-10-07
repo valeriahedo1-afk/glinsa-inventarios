@@ -20,13 +20,11 @@ st.set_page_config(
 def cargar_datos():
     df = pd.read_csv("inventario_demo_glinsa.csv")
 
-    # Convertir fecha de caducidad
     df["caducidad"] = pd.to_datetime(
         df["caducidad"],
         errors="coerce"
     )
 
-    # Convertir existencia a número
     df["existencia"] = pd.to_numeric(
         df["existencia"],
         errors="coerce"
@@ -44,7 +42,6 @@ df = cargar_datos()
 
 hoy = pd.Timestamp.today().normalize()
 
-# Días restantes para caducidad
 df["dias_para_caducar"] = (
     df["caducidad"] - hoy
 ).dt.days
@@ -108,17 +105,14 @@ lotes_criticos = df_activo[
     (df_activo["dias_para_caducar"] <= 30)
 ]["lote"].nunique()
 
-
 lotes_atencion = df_activo[
     (df_activo["dias_para_caducar"] > 30) &
     (df_activo["dias_para_caducar"] <= 90)
 ]["lote"].nunique()
 
-
 lotes_vigentes = df_activo[
     df_activo["dias_para_caducar"] > 90
 ]["lote"].nunique()
-
 
 lotes_vencidos = df_activo[
     df_activo["dias_para_caducar"] < 0
@@ -169,7 +163,6 @@ if modulo == "Dashboard":
 
     st.divider()
 
-
     # --------------------------------------------------------
     # KPIs PRINCIPALES
     # --------------------------------------------------------
@@ -178,30 +171,29 @@ if modulo == "Dashboard":
 
     with col1:
         st.metric(
-            label="Productos",
-            value=total_productos
+            "Productos",
+            total_productos
         )
 
     with col2:
         st.metric(
-            label="Lotes activos",
-            value=lotes_activos
+            "Lotes activos",
+            lotes_activos
         )
 
     with col3:
         st.metric(
-            label="Próximos a caducar",
-            value=proximos_caducar
+            "Próximos a caducar",
+            proximos_caducar
         )
 
     with col4:
         st.metric(
-            label="Productos por reabastecer",
-            value="--"
+            "Productos por reabastecer",
+            "--"
         )
 
     st.divider()
-
 
     # --------------------------------------------------------
     # SEMÁFORO DE CADUCIDADES
@@ -213,30 +205,29 @@ if modulo == "Dashboard":
 
     with sem1:
         st.metric(
-            label="🔴 Críticos (0–30 días)",
-            value=lotes_criticos
+            "🔴 Críticos (0–30 días)",
+            lotes_criticos
         )
 
     with sem2:
         st.metric(
-            label="🟡 Atención (31–90 días)",
-            value=lotes_atencion
+            "🟡 Atención (31–90 días)",
+            lotes_atencion
         )
 
     with sem3:
         st.metric(
-            label="🟢 Vigentes (+90 días)",
-            value=lotes_vigentes
+            "🟢 Vigentes (+90 días)",
+            lotes_vigentes
         )
 
     with sem4:
         st.metric(
-            label="⚫ Vencidos",
-            value=lotes_vencidos
+            "⚫ Vencidos",
+            lotes_vencidos
         )
 
     st.divider()
-
 
     # --------------------------------------------------------
     # ALERTAS DE CADUCIDAD
@@ -295,9 +286,7 @@ if modulo == "Dashboard":
             "o igual a 90 días."
         )
 
-
     st.divider()
-
 
     # --------------------------------------------------------
     # ESTADO DEL ALMACÉN
@@ -306,14 +295,12 @@ if modulo == "Dashboard":
     st.subheader("📦 Estado del almacén")
 
     st.info(
-        "En esta sección incorporaremos el análisis "
+        "Posteriormente incorporaremos aquí el análisis "
         "de existencias, stock mínimo y necesidades "
         "de reabastecimiento."
     )
 
-
     st.divider()
-
 
     # --------------------------------------------------------
     # MOVIMIENTO DE INVENTARIO
@@ -322,8 +309,8 @@ if modulo == "Dashboard":
     st.subheader("📈 Movimiento de inventario")
 
     st.info(
-        "Esta sección mostrará las entradas y salidas "
-        "históricas del almacén."
+        "Posteriormente incorporaremos las entradas "
+        "y salidas históricas."
     )
 
 
@@ -341,28 +328,70 @@ elif modulo == "Inventario":
 
     st.divider()
 
-    # Buscador
-    busqueda = st.text_input(
-        "🔎 Buscar producto",
-        placeholder="Escribe el nombre del producto..."
-    )
+    # --------------------------------------------------------
+    # FILTROS
+    # --------------------------------------------------------
+
+    st.subheader("🔎 Consulta de inventario")
+
+    filtro1, filtro2 = st.columns(2)
+
+    with filtro1:
+
+        buscar_producto = st.text_input(
+            "Buscar por producto",
+            placeholder="Escribe el nombre del producto..."
+        )
+
+    with filtro2:
+
+        buscar_lote = st.text_input(
+            "Buscar por lote",
+            placeholder="Escribe el número o código del lote..."
+        )
 
     inventario_mostrar = df_activo.copy()
 
-    if busqueda:
+    # Filtro por producto
+    if buscar_producto:
 
         inventario_mostrar = inventario_mostrar[
             inventario_mostrar["producto"]
             .astype(str)
             .str.contains(
-                busqueda,
+                buscar_producto,
                 case=False,
                 na=False
             )
         ]
 
+    # Filtro por lote
+    if buscar_lote:
+
+        inventario_mostrar = inventario_mostrar[
+            inventario_mostrar["lote"]
+            .astype(str)
+            .str.contains(
+                buscar_lote,
+                case=False,
+                na=False
+            )
+        ]
+
+    st.divider()
+
+    # --------------------------------------------------------
+    # RESULTADOS
+    # --------------------------------------------------------
+
+    st.subheader("Resultados")
+
+    st.caption(
+        f"Se encontraron {len(inventario_mostrar)} registros."
+    )
+
     inventario_mostrar = inventario_mostrar.sort_values(
-        by="producto"
+        by=["producto", "lote"]
     )
 
     tabla_inventario = inventario_mostrar[
@@ -390,11 +419,20 @@ elif modulo == "Inventario":
         .dt.strftime("%d/%m/%Y")
     )
 
-    st.dataframe(
-        tabla_inventario,
-        use_container_width=True,
-        hide_index=True
-    )
+    if not tabla_inventario.empty:
+
+        st.dataframe(
+            tabla_inventario,
+            use_container_width=True,
+            hide_index=True
+        )
+
+    else:
+
+        st.warning(
+            "No se encontraron registros con "
+            "los filtros seleccionados."
+        )
 
 
 # ============================================================
@@ -405,14 +443,227 @@ elif modulo == "Recepción y Calidad":
 
     st.title("🔍 Recepción y Calidad")
 
-    st.write(
-        "Validación de productos recibidos, lotes, "
-        "caducidades y documentación de calidad."
+    st.caption(
+        "Registro y validación inicial de materiales recibidos"
     )
 
-    st.info(
-        "Módulo en construcción"
+    st.divider()
+
+    st.subheader("📥 Nueva recepción")
+
+    st.write(
+        "Captura los datos del material recibido para "
+        "realizar la validación antes de su ingreso "
+        "al inventario."
     )
+
+    with st.form("formulario_recepcion"):
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+
+            producto_recepcion = st.text_input(
+                "Producto *"
+            )
+
+            proveedor = st.text_input(
+                "Proveedor *"
+            )
+
+            lote_recepcion = st.text_input(
+                "Lote *"
+            )
+
+            cantidad_recepcion = st.number_input(
+                "Cantidad recibida *",
+                min_value=0.0,
+                step=1.0
+            )
+
+        with col2:
+
+            unidad_recepcion = st.selectbox(
+                "Unidad *",
+                [
+                    "KG",
+                    "L",
+                    "GAL",
+                    "PZA",
+                    "TAMBOR",
+                    "OTRA"
+                ]
+            )
+
+            fecha_fabricacion = st.date_input(
+                "Fecha de fabricación"
+            )
+
+            fecha_caducidad = st.date_input(
+                "Fecha de caducidad"
+            )
+
+            numero_documento = st.text_input(
+                "Factura / Orden de compra"
+            )
+
+        st.divider()
+
+        st.subheader("🧪 Validación de Calidad")
+
+        certificado = st.checkbox(
+            "Certificado de calidad recibido"
+        )
+
+        producto_coincide = st.checkbox(
+            "El producto físico coincide con la documentación"
+        )
+
+        lote_coincide = st.checkbox(
+            "El lote físico coincide con el certificado"
+        )
+
+        caducidad_coincide = st.checkbox(
+            "La fecha de caducidad coincide con el certificado"
+        )
+
+        documentacion_completa = st.checkbox(
+            "La documentación está completa"
+        )
+
+        observaciones = st.text_area(
+            "Observaciones"
+        )
+
+        validar = st.form_submit_button(
+            "Validar recepción"
+        )
+
+    # --------------------------------------------------------
+    # RESULTADO DE VALIDACIÓN
+    # --------------------------------------------------------
+
+    if validar:
+
+        campos_obligatorios = (
+            producto_recepcion.strip() != "" and
+            proveedor.strip() != "" and
+            lote_recepcion.strip() != "" and
+            cantidad_recepcion > 0
+        )
+
+        validaciones_calidad = (
+            certificado and
+            producto_coincide and
+            lote_coincide and
+            caducidad_coincide and
+            documentacion_completa
+        )
+
+        if not campos_obligatorios:
+
+            st.error(
+                "❌ Faltan datos obligatorios para "
+                "procesar la recepción."
+            )
+
+        elif fecha_caducidad <= fecha_fabricacion:
+
+            st.error(
+                "❌ La fecha de caducidad debe ser posterior "
+                "a la fecha de fabricación."
+            )
+
+        elif validaciones_calidad:
+
+            st.success(
+                "✅ RECEPCIÓN LIBERADA"
+            )
+
+            st.write(
+                "El material cumple con las validaciones "
+                "registradas y puede continuar al proceso "
+                "de ingreso al almacén."
+            )
+
+            resumen = pd.DataFrame(
+                {
+                    "Campo": [
+                        "Producto",
+                        "Proveedor",
+                        "Lote",
+                        "Cantidad",
+                        "Unidad",
+                        "Fabricación",
+                        "Caducidad",
+                        "Documento"
+                    ],
+                    "Información": [
+                        producto_recepcion,
+                        proveedor,
+                        lote_recepcion,
+                        cantidad_recepcion,
+                        unidad_recepcion,
+                        fecha_fabricacion.strftime("%d/%m/%Y"),
+                        fecha_caducidad.strftime("%d/%m/%Y"),
+                        numero_documento
+                    ]
+                }
+            )
+
+            st.dataframe(
+                resumen,
+                use_container_width=True,
+                hide_index=True
+            )
+
+            st.info(
+                "En la siguiente etapa conectaremos esta "
+                "liberación con el registro de entrada "
+                "del inventario."
+            )
+
+        else:
+
+            st.error(
+                "🚫 RECEPCIÓN NO LIBERADA"
+            )
+
+            st.write(
+                "Se detectaron validaciones pendientes "
+                "o inconsistencias."
+            )
+
+            problemas = []
+
+            if not certificado:
+                problemas.append(
+                    "Falta certificado de calidad."
+                )
+
+            if not producto_coincide:
+                problemas.append(
+                    "El producto no ha sido validado "
+                    "contra la documentación."
+                )
+
+            if not lote_coincide:
+                problemas.append(
+                    "El lote no coincide o no ha sido validado."
+                )
+
+            if not caducidad_coincide:
+                problemas.append(
+                    "La caducidad no coincide o no ha sido validada."
+                )
+
+            if not documentacion_completa:
+                problemas.append(
+                    "La documentación está incompleta."
+                )
+
+            for problema in problemas:
+                st.warning(problema)
 
 
 # ============================================================
@@ -423,9 +674,8 @@ elif modulo == "Entradas y Salidas":
 
     st.title("🚚 Entradas y Salidas")
 
-    st.write(
-        "Registro y monitoreo de movimientos "
-        "del almacén."
+    st.caption(
+        "Registro y monitoreo de movimientos del almacén"
     )
 
     st.info(
@@ -448,9 +698,8 @@ elif modulo == "Caducidades":
 
     st.divider()
 
-
     # --------------------------------------------------------
-    # KPIs DE CADUCIDAD
+    # KPIs
     # --------------------------------------------------------
 
     c1, c2, c3, c4 = st.columns(4)
@@ -481,9 +730,8 @@ elif modulo == "Caducidades":
 
     st.divider()
 
-
     # --------------------------------------------------------
-    # FILTRO
+    # FILTRO POR ESTADO
     # --------------------------------------------------------
 
     estado_seleccionado = st.selectbox(
@@ -507,14 +755,11 @@ elif modulo == "Caducidades":
             == estado_seleccionado
         ]
 
-
-    # Ordenar por caducidad
     tabla_filtrada = tabla_filtrada.sort_values(
         by="dias_para_caducar",
         ascending=True,
         na_position="last"
     )
-
 
     tabla_caducidades = tabla_filtrada[
         [
@@ -528,7 +773,6 @@ elif modulo == "Caducidades":
         ]
     ].copy()
 
-
     tabla_caducidades.columns = [
         "Estado",
         "Producto",
@@ -539,12 +783,10 @@ elif modulo == "Caducidades":
         "Días restantes"
     ]
 
-
     tabla_caducidades["Caducidad"] = (
         tabla_caducidades["Caducidad"]
         .dt.strftime("%d/%m/%Y")
     )
-
 
     st.dataframe(
         tabla_caducidades,
@@ -587,10 +829,3 @@ elif modulo == "IA Documental":
     st.info(
         "Módulo en construcción"
     )
-
-    
-
-
-
-
-
