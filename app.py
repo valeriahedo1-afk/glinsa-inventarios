@@ -113,6 +113,11 @@ lotes_atencion = df[
     (df["existencia"] > 0)
 ]["lote"].nunique()
 
+lotes_vigentes = df[
+    (df["dias_para_caducar"] > 90) &
+    (df["existencia"] > 0)
+]["lote"].nunique()
+
 lotes_vencidos = df[
     (df["dias_para_caducar"] < 0) &
     (df["existencia"] > 0)
@@ -196,9 +201,9 @@ if modulo == "Dashboard":
     # SEMÁFORO DE CADUCIDADES
     # --------------------------------------
 
-    st.subheader("🚦 Semáforo de caducidades")
+      st.subheader("🚦 Semáforo de caducidades")
 
-    sem1, sem2, sem3 = st.columns(3)
+    sem1, sem2, sem3, sem4 = st.columns(4)
 
     with sem1:
         st.metric(
@@ -214,11 +219,15 @@ if modulo == "Dashboard":
 
     with sem3:
         st.metric(
+            "🟢 Vigentes (+90 días)",
+            lotes_vigentes
+        )
+
+    with sem4:
+        st.metric(
             "⚫ Vencidos",
             lotes_vencidos
         )
-
-    st.divider()
 
     # --------------------------------------
     # ALERTAS DE INVENTARIO
