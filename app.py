@@ -26,7 +26,7 @@ def cargar_datos():
         errors="coerce"
     )
 
-    # Asegurar que existencia sea numérica
+    # Convertir existencia a número
     df["existencia"] = pd.to_numeric(
         df["existencia"],
         errors="coerce"
@@ -47,21 +47,74 @@ hoy = pd.Timestamp.today().normalize()
 # Productos únicos
 total_productos = df["producto"].nunique()
 
-# Lotes con existencia mayor a cero
+# Lotes activos
 lotes_activos = df.loc[
     df["existencia"] > 0,
     "lote"
 ].nunique()
 
-# Calcular días restantes para caducidad
+# Días restantes para caducidad
 df["dias_para_caducar"] = (
     df["caducidad"] - hoy
 ).dt.days
 
-# Lotes que caducan en los próximos 90 días
+
+# ==========================================
+# CLASIFICACIÓN DE CADUCIDADES
+# ==========================================
+
+def clasificar_caducidad(dias):
+
+    if pd.isna(dias):
+        return "⚪ Sin fecha"
+
+    elif dias < 0:
+        return "⚫ Vencido"
+
+    elif dias <= 30:
+        return "🔴 Crítico"
+
+    elif dias <= 90:
+        return "🟡 Atención"
+
+    else:
+        return "🟢 Vigente"
+
+
+df["estado_caducidad"] = df["dias_para_caducar"].apply(
+    clasificar_caducidad
+)
+
+
+# ==========================================
+# LOTES PRÓXIMOS A CADUCAR
+# ==========================================
+
 proximos_caducar = df[
     (df["dias_para_caducar"] >= 0) &
     (df["dias_para_caducar"] <= 90) &
+    (df["existencia"] > 0)
+]["lote"].nunique()
+
+
+# ==========================================
+# INDICADORES DEL SEMÁFORO
+# ==========================================
+
+lotes_criticos = df[
+    (df["dias_para_caducar"] >= 0) &
+    (df["dias_para_caducar"] <= 30) &
+    (df["existencia"] > 0)
+]["lote"].nunique()
+
+lotes_atencion = df[
+    (df["dias_para_caducar"] > 30) &
+    (df["dias_para_caducar"] <= 90) &
+    (df["existencia"] > 0)
+]["lote"].nunique()
+
+lotes_vencidos = df[
+    (df["dias_para_caducar"] < 0) &
     (df["existencia"] > 0)
 ]["lote"].nunique()
 
@@ -140,29 +193,106 @@ if modulo == "Dashboard":
     st.divider()
 
     # --------------------------------------
-    # ALERTAS Y ESTADO DEL ALMACÉN
+    # SEMÁFORO DE CADUCIDADES
     # --------------------------------------
 
-    col_izquierda, col_derecha = st.columns(2)
+    st.subheader("🚦 Semáforo de caducidades")
 
-    with col_izquierda:
+    sem1, sem2, sem3 = st.columns(3)
 
-        st.subheader("⚠️ Alertas de inventario")
-
-        st.info(
-            "Aquí aparecerán automáticamente los productos "
-            "con inventario bajo, próximos a caducar o con "
-            "alguna inconsistencia."
+    with sem1:
+        st.metric(
+            "🔴 Críticos (0–30 días)",
+            lotes_criticos
         )
 
-    with col_derecha:
-
-        st.subheader("📦 Estado del almacén")
-
-        st.info(
-            "Aquí visualizaremos el estado general del "
-            "inventario de GLINSA."
+    with sem2:
+        st.metric(
+            "🟡 Atención (31–90 días)",
+            lotes_atencion
         )
+
+    with sem3:
+        st.metric(
+            "⚫ Vencidos",
+            lotes_vencidos
+        )
+
+    st.divider()
+
+    # --------------------------------------
+    # ALERTAS DE INVENTARIO
+    # --------------------------------------
+
+    st.subheader("⚠️ Alertas de caducidad")
+
+    alertas = df[
+        (
+            (df["dias_para_caducar"] <= 90) |
+            (df["dias_para_caducar"] < 0)
+        ) &
+        (df["existencia"] > 0)
+    ].copy()
+
+    if len(alertas) > 0:
+
+        alertas = alertas.sort_values(
+            by="dias_para_caducar",
+            ascending=True
+        )
+
+        tabla_alertas = alertas[
+            [
+                "estado_caducidad",
+                "producto",
+                "lote",
+                "existencia",
+                "unidad",
+                "caducidad",
+                "dias_para_caducar"
+            ]
+        ].copy()
+
+        tabla_alertas.columns = [
+            "Estado",
+            "Producto",
+            "Lote",
+            "Existencia",
+            "Unidad",
+            "Caducidad",
+            "Días restantes"
+        ]
+
+        tabla_alertas["Caducidad"] = (
+            tabla_alertas["Caducidad"]
+            .dt.strftime("%d/%m/%Y")
+        )
+
+        st.dataframe(
+            tabla_alertas,
+            use_container_width=True,
+            hide_index=True
+        )
+
+    else:
+
+        st.success(
+            "No existen lotes con caducidad menor a 90 días."
+        )
+
+    st.divider()
+
+    # --------------------------------------
+    # ESTADO DEL ALMACÉN
+    # --------------------------------------
+
+    st.subheader("📦 Estado del almacén")
+
+    st.info(
+        "En esta sección incorporaremos posteriormente "
+        "el análisis de existencias, stock mínimo y "
+        "necesidades de reabastecimiento."
+    )
 
     st.divider()
 
@@ -173,8 +303,8 @@ if modulo == "Dashboard":
     st.subheader("📈 Movimiento de inventario")
 
     st.info(
-        "Esta sección mostrará las entradas y salidas "
-        "históricas del almacén."
+        "Esta sección mostrará posteriormente las entradas "
+        "y salidas históricas del almacén."
     )
 
 
@@ -233,8 +363,87 @@ elif modulo == "Caducidades":
 
     st.title("⏳ Control de Caducidades")
 
+    st.caption(
+        "Monitoreo de lotes y productos según su fecha "
+        "de caducidad."
+    )
+
+    st.divider()
+
+    # Filtro por estado
+    estado_seleccionado = st.selectbox(
+        "Filtrar por estado",
+        [
+            "Todos",
+            "🔴 Crítico",
+            "🟡 Atención",
+            "🟢 Vigente",
+            "⚫ Vencido",
+            "⚪ Sin fecha"
+        ]
+    )
+
+    inventario_activo = df[
+        df["existencia"] > 0
+    ].copy()
+
+    if estado_seleccionado != "Todos":
+
+        inventario_activo = inventario_activo[
+            inventario_activo["estado_caducidad"]
+            == estado_seleccionado
+        ]
+
+    inventario_activo = inventario_activo.sort_values(
+        by="dias_para_caducar",
+        ascending=True,
+        na_position="last"
+    )
+
+    tabla_caducidades = inventario_activo[
+        [
+            "estado_caducidad",
+            "producto",
+            "lote",
+            "existencia",
+            "unidad",
+            "caducidad",
+            "dias_para_caducar"
+        ]
+    ].copy()
+
+    tabla_caducidades.columns = [
+        "Estado",
+        "Producto",
+        "Lote",
+        "Existencia",
+        "Unidad",
+        "Caducidad",
+        "Días restantes"
+    ]
+
+    tabla_caducidades["Caducidad"] = (
+        tabla_caducidades["Caducidad"]
+        .dt.strftime("%d/%m/%Y")
+    )
+
+    st.dataframe(
+        tabla_caducidades,
+        use_container_width=True,
+        hide_index=True
+    )
+
+
+# ==========================================
+# ENTRADAS Y SALIDAS
+# ==========================================
+
+elif modulo == "Entradas y Salidas":
+
+    st.title("🚚 Entradas y Salidas")
+
     st.write(
-        "Monitoreo de lotes y productos próximos a caducar."
+        "Registro y monitoreo de movimientos del almacén."
     )
 
     st.info("Módulo en construcción")
@@ -270,3 +479,10 @@ elif modulo == "IA Documental":
     )
 
     st.info("Módulo en construcción")
+
+    
+
+
+
+
+
