@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
 
 # ==========================================
 # CONFIGURACIÓN GENERAL
@@ -11,6 +10,8 @@ st.set_page_config(
     page_icon="📦",
     layout="wide"
 )
+
+
 # ==========================================
 # CARGA DE DATOS
 # ==========================================
@@ -18,13 +19,25 @@ st.set_page_config(
 @st.cache_data
 def cargar_datos():
     df = pd.read_csv("inventario_demo_glinsa.csv")
+
+    # Convertir caducidad a formato fecha
     df["caducidad"] = pd.to_datetime(
         df["caducidad"],
         errors="coerce"
     )
+
+    # Asegurar que existencia sea numérica
+    df["existencia"] = pd.to_numeric(
+        df["existencia"],
+        errors="coerce"
+    ).fillna(0)
+
     return df
 
+
 df = cargar_datos()
+
+
 # ==========================================
 # CÁLCULO DE INDICADORES
 # ==========================================
@@ -40,7 +53,7 @@ lotes_activos = df.loc[
     "lote"
 ].nunique()
 
-# Días restantes para caducidad
+# Calcular días restantes para caducidad
 df["dias_para_caducar"] = (
     df["caducidad"] - hoy
 ).dt.days
@@ -51,6 +64,8 @@ proximos_caducar = df[
     (df["dias_para_caducar"] <= 90) &
     (df["existencia"] > 0)
 ]["lote"].nunique()
+
+
 # ==========================================
 # MENÚ LATERAL
 # ==========================================
@@ -73,7 +88,9 @@ modulo = st.sidebar.radio(
 
 st.sidebar.divider()
 
-st.sidebar.caption("Prototipo de automatización de inventarios")
+st.sidebar.caption(
+    "Prototipo de automatización de inventarios"
+)
 
 
 # ==========================================
@@ -83,41 +100,48 @@ st.sidebar.caption("Prototipo de automatización de inventarios")
 if modulo == "Dashboard":
 
     st.title("📊 Dashboard de Inventarios")
-    st.caption("Monitoreo general de la operación de almacén")
+
+    st.caption(
+        "Monitoreo general de la operación de almacén"
+    )
 
     st.divider()
 
-    # KPIs principales
+    # --------------------------------------
+    # KPIs PRINCIPALES
+    # --------------------------------------
 
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-    st.metric(
-        label="Productos",
-        value=total_productos
-    )
+        st.metric(
+            label="Productos",
+            value=total_productos
+        )
 
-with col2:
-    st.metric(
-        label="Lotes activos",
-        value=lotes_activos
-    )
+    with col2:
+        st.metric(
+            label="Lotes activos",
+            value=lotes_activos
+        )
 
-with col3:
-    st.metric(
-        label="Próximos a caducar",
-        value=proximos_caducar
-    )
+    with col3:
+        st.metric(
+            label="Próximos a caducar",
+            value=proximos_caducar
+        )
 
-with col4:
-    st.metric(
-        label="Productos por reabastecer",
-        value="--"
-    )
+    with col4:
+        st.metric(
+            label="Productos por reabastecer",
+            value="--"
+        )
 
     st.divider()
 
-    # Segunda sección
+    # --------------------------------------
+    # ALERTAS Y ESTADO DEL ALMACÉN
+    # --------------------------------------
 
     col_izquierda, col_derecha = st.columns(2)
 
@@ -141,6 +165,10 @@ with col4:
         )
 
     st.divider()
+
+    # --------------------------------------
+    # MOVIMIENTO DE INVENTARIO
+    # --------------------------------------
 
     st.subheader("📈 Movimiento de inventario")
 
@@ -213,7 +241,7 @@ elif modulo == "Caducidades":
 
 
 # ==========================================
-# PREDICCIÓN
+# PREDICCIÓN Y REABASTO
 # ==========================================
 
 elif modulo == "Predicción y Reabasto":
